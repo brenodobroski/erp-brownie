@@ -42,6 +42,8 @@ export default function App() {
   const [trips, setTrips] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [clients, setClients] = useState([]);
+  const [ifood, setIfood] = useState([]);
+  const [config, setConfig] = useState({});
 
   const [sheetUrl, setSheetUrl] = useState("");
   const [showConfig, setShowConfig] = useState(false);
@@ -53,10 +55,12 @@ export default function App() {
   // modais rápidos (usados pelo FAB no mobile)
   const [quickClient, setQuickClient] = useState(false);
   const [quickTrip, setQuickTrip] = useState(false);
+  const [quickIfood, setQuickIfood] = useState(false);
 
   const applyData = (d) => {
     setIngredients(d.ingredients || []); setTrips(d.trips || []);
     setRecipes(d.recipes || []); setClients(d.clients || []);
+    setIfood(d.ifood || []); setConfig(d.config || {});
   };
 
   useEffect(() => {
@@ -78,7 +82,7 @@ export default function App() {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { ingredients, trips, recipes, clients };
+    const payload = { ingredients, trips, recipes, clients, ifood, config };
     writeCache(payload);
     if (firstSave.current) { firstSave.current = false; return; }
     if (sheetUrl) {
@@ -90,7 +94,7 @@ export default function App() {
         else { setSyncStatus("error"); setSyncMsg(r.error || "falha ao salvar"); }
       }, 1000);
     }
-  }, [ingredients, trips, recipes, clients, loaded]);
+  }, [ingredients, trips, recipes, clients, ifood, config, loaded]);
 
   const saveUrl = (url) => { setSheetUrl(url); persistUrl(url); };
   const doPull = async () => {
@@ -111,8 +115,9 @@ export default function App() {
     return melhor;
   };
 
-  // helper de compra usado pelo modal rápido
+  // helpers usados pelos modais rápidos
   const addTripObj = (obj) => setTrips((ts) => [...ts, { id: uid("trip"), data: hojeISO(), ...obj }]);
+  const addIfoodObj = (obj) => setIfood((vs) => [...vs, { id: uid("ifd"), ...obj }]);
 
   const tabs = [
     { id: "dashboard", label: "Início", icon: BarChart3 },
@@ -163,11 +168,11 @@ export default function App() {
         {tab === "mercado" && <Mercado trips={trips} setTrips={setTrips} ingredients={ingredients} />}
         {tab === "ingredientes" && <Ingredientes ingredients={ingredients} setIngredients={setIngredients} />}
         {tab === "precificacao" && <Precificacao recipes={recipes} setRecipes={setRecipes} ingredients={ingredients} ultimaCompra={ultimaCompra} />}
-        {tab === "ifood" && <Ifood />}
+        {tab === "ifood" && <Ifood ifood={ifood} setIfood={setIfood} recipes={recipes} config={config} setConfig={setConfig} />}
       </main>
 
       {/* navegação mobile: tab bar + FAB */}
-      <MobileNav tab={tab} setTab={setTab} tabs={tabs} onNewClient={() => setQuickClient(true)} onNewTrip={() => setQuickTrip(true)} />
+      <MobileNav tab={tab} setTab={setTab} tabs={tabs} onNewClient={() => setQuickClient(true)} onNewTrip={() => setQuickTrip(true)} onNewIfood={() => setQuickIfood(true)} />
 
       {showConfig && <ConfigModal sheetUrl={sheetUrl} saveUrl={saveUrl} onClose={() => setShowConfig(false)} onPull={doPull} onClear={clearCache} status={syncStatus} msg={syncMsg} />}
       {quickClient && <QuickClientModal clients={clients} recipes={recipes} onClose={() => setQuickClient(false)}
@@ -175,6 +180,7 @@ export default function App() {
         onAddEntrega={(clientId, mov) => setClients((cs) => cs.map((c) => c.id === clientId ? { ...c, movimentos: [...c.movimentos, { id: uid("mov"), ...mov }] } : c))}
         onDone={() => { setQuickClient(false); setTab("clientes"); }} />}
       {quickTrip && <QuickTripModal ingredients={ingredients} onClose={() => setQuickTrip(false)} onSave={(o) => { addTripObj(o); setQuickTrip(false); setTab("mercado"); }} />}
+      {quickIfood && <IfoodPedidoModal recipes={recipes} config={config} onClose={() => setQuickIfood(false)} onSave={(o) => { addIfoodObj(o); setQuickIfood(false); setTab("ifood"); }} />}
     </div>
   );
 }
@@ -199,9 +205,8 @@ function LoadingScreen() {
 }
 
 /* ====== NAV MOBILE ====== */
-function MobileNav({ tab, setTab, tabs, onNewClient, onNewTrip }) {
+function MobileNav({ tab, setTab, tabs, onNewClient, onNewTrip, onNewIfood }) {
   const [fabOpen, setFabOpen] = useState(false);
-  // 4 itens na barra (sem ifood, que fica acessível mas priorizamos os principais) + centro pro FAB
   const left = [tabs[0], tabs[1]];
   const right = [tabs[2], tabs[3]];
   const Item = ({ t }) => {
@@ -216,26 +221,26 @@ function MobileNav({ tab, setTab, tabs, onNewClient, onNewTrip }) {
     <>
       {fabOpen && <div className="fixed inset-0 z-40 md:hidden" style={{ backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", background: "rgba(0,0,0,0.25)" }} onClick={() => setFabOpen(false)} />}
       <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
-        {/* leque do FAB */}
         {fabOpen && (
-          <div className="flex justify-center gap-4 mb-3 px-4">
-            <button onClick={() => { setFabOpen(false); onNewClient(); }}
-              className="flex flex-col items-center gap-1 animate-pop">
+          <div className="flex justify-center gap-3 mb-3 px-4 flex-wrap">
+            <button onClick={() => { setFabOpen(false); onNewClient(); }} className="flex flex-col items-center gap-1 animate-pop">
               <span className="w-14 h-14 rounded-full bg-white shadow-lg border border-amber-100 flex items-center justify-center text-amber-700"><Users size={22} /></span>
               <span className="text-xs font-medium text-stone-700 bg-white px-2 py-0.5 rounded-full shadow">Cliente</span>
             </button>
-            <button onClick={() => { setFabOpen(false); onNewTrip(); }}
-              className="flex flex-col items-center gap-1 animate-pop">
+            <button onClick={() => { setFabOpen(false); onNewTrip(); }} className="flex flex-col items-center gap-1 animate-pop">
               <span className="w-14 h-14 rounded-full bg-white shadow-lg border border-amber-100 flex items-center justify-center text-amber-700"><ShoppingCart size={22} /></span>
               <span className="text-xs font-medium text-stone-700 bg-white px-2 py-0.5 rounded-full shadow">Compra</span>
+            </button>
+            <button onClick={() => { setFabOpen(false); onNewIfood(); }} className="flex flex-col items-center gap-1 animate-pop">
+              <span className="w-14 h-14 rounded-full bg-white shadow-lg border border-amber-100 flex items-center justify-center text-red-500"><ShoppingBag size={22} /></span>
+              <span className="text-xs font-medium text-stone-700 bg-white px-2 py-0.5 rounded-full shadow">Pedido iFood</span>
             </button>
           </div>
         )}
         <div className="bg-white border-t border-amber-100 shadow-lg flex items-center px-2 relative">
           <Item t={left[0]} /><Item t={left[1]} />
           <div className="w-16 flex justify-center">
-            <button onClick={() => setFabOpen(!fabOpen)}
-              className={`w-14 h-14 -mt-6 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-xl flex items-center justify-center transition ${fabOpen ? "rotate-45" : ""}`}>
+            <button onClick={() => setFabOpen(!fabOpen)} className={`w-14 h-14 -mt-6 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-xl flex items-center justify-center transition ${fabOpen ? "rotate-45" : ""}`}>
               <Plus size={26} />
             </button>
           </div>
@@ -373,6 +378,48 @@ function QuickTripModal({ ingredients, onClose, onSave }) {
         )}
         <button onClick={() => itens.length > 0 && onSave({ mercado: mercado || "Mercado", itens })} className="btn-primary w-full">Salvar compra</button>
       </div>
+    </ModalShell>
+  );
+}
+
+/* formulário de pedido iFood — reutilizado na página (desktop) e no modal (mobile) */
+function IfoodPedidoForm({ recipes, config, onSave }) {
+  const taxa = Number(config.ifoodTaxa) || 0;
+  const custoUnit = Number(config.ifoodCusto) || 0;
+  const recOpts = recipes.map((r) => ({ value: r.id, label: r.nome }));
+  const [receitaId, setReceitaId] = useState("");
+  const [qtd, setQtd] = useState("");
+  const [bruto, setBruto] = useState("");
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const submit = () => {
+    if (!qtd || !bruto) return;
+    onSave({ data: new Date(data + "T12:00:00").toISOString(), receitaId, qtd, valorBruto: bruto });
+    setReceitaId(""); setQtd(""); setBruto("");
+  };
+  const previa = bruto && qtd;
+  const txV = Number(bruto) * taxa / 100;
+  const liq = Number(bruto) - txV;
+  const custo = custoUnit * Number(qtd);
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="Data" style={{ width: 150 }}><input type="date" value={data} onChange={(e) => setData(e.target.value)} className="input" /></Field>
+        <Field label="Receita" style={{ flex: "1 1 160px" }}><Dropdown value={receitaId} onChange={setReceitaId} options={recOpts} placeholder="Qual brownie" searchable /></Field>
+        <Field label="Qtd" style={{ width: 90 }}><input type="number" value={qtd} onChange={(e) => setQtd(e.target.value)} placeholder="2" className="input" /></Field>
+        <Field label="Valor bruto R$" style={{ width: 130 }}><input type="number" value={bruto} onChange={(e) => setBruto(e.target.value)} placeholder="40" className="input" /></Field>
+        <button onClick={submit} className="btn-ok"><Check size={16} /> Lançar</button>
+      </div>
+      {previa ? (
+        <p className="text-xs text-stone-500 mt-2">Taxa: <b>{BRL(txV)}</b> · Líquido: <b className="text-green-700">{BRL(liq)}</b> · Custo: <b>{BRL(custo)}</b> · Lucro real: <b className="text-amber-800">{BRL(liq - custo)}</b></p>
+      ) : null}
+    </div>
+  );
+}
+
+function IfoodPedidoModal({ recipes, config, onClose, onSave }) {
+  return (
+    <ModalShell title="Pedido iFood" onClose={onClose}>
+      <IfoodPedidoForm recipes={recipes} config={config} onSave={onSave} />
     </ModalShell>
   );
 }
@@ -919,13 +966,107 @@ function Dashboard({ trips, clients, recipes }) {
   );
 }
 
-function Ifood() {
+function Ifood({ ifood, setIfood, recipes, config, setConfig }) {
+  const now = new Date();
+  const [mes, setMes] = useState(ymd(now));
+  const [showCfg, setShowCfg] = useState(false);
+
+  const taxa = Number(config.ifoodTaxa) || 0;
+  const custoUnit = Number(config.ifoodCusto) || 0;
+  const recNome = (id) => { const x = recipes.find((r) => r.id === id); return x ? x.nome : "Brownie"; };
+
+  const addPedido = (obj) => setIfood([...ifood, { id: uid("ifd"), ...obj }]);
+  const remove = (id) => setIfood(ifood.filter((v) => v.id !== id));
+
+  const calc = (v) => {
+    const b = Number(v.valorBruto) || 0;
+    const q = Number(v.qtd) || 0;
+    const tx = b * (taxa / 100);
+    const liq = b - tx;
+    const custo = custoUnit * q;
+    return { b, q, tx, liq, custo, lucro: liq - custo };
+  };
+
+  const doMes = ifood.filter((v) => ymd(v.data) === mes);
+  const resumo = doMes.reduce((a, v) => {
+    const c = calc(v);
+    a.bruto += c.b; a.taxa += c.tx; a.liq += c.liq; a.custo += c.custo; a.lucro += c.lucro; a.qtd += c.q;
+    return a;
+  }, { bruto: 0, taxa: 0, liq: 0, custo: 0, lucro: 0, qtd: 0 });
+
+  const mesOpts = [];
+  for (let i = 0; i < 12; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); mesOpts.push({ value: ymd(d), label: `${MESES[d.getMonth()]} ${d.getFullYear()}` }); }
+
+  const semConfig = !taxa && !custoUnit;
+
   return (
-    <Card className="p-12 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4"><ShoppingBag size={32} className="text-red-500" /></div>
-      <h2 className="text-xl font-bold text-amber-900 mb-2">Vendas iFood</h2>
-      <p className="text-stone-500 max-w-md mx-auto">Em breve! Aqui vocês vão poder lançar e acompanhar as vendas feitas pelo iFood.</p>
-      <span className="inline-block mt-4 text-xs font-semibold bg-amber-100 text-amber-800 px-3 py-1 rounded-full">Em desenvolvimento</span>
-    </Card>
+    <div>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2"><ShoppingBag size={20} className="text-red-500" /> Vendas iFood</h2>
+        <div className="flex items-center gap-2">
+          <Calendar size={16} className="text-amber-600" />
+          <Dropdown value={mes} onChange={setMes} options={mesOpts} style={{ width: 150 }} />
+          <button onClick={() => setShowCfg(true)} className="btn-ghost"><Settings size={15} /> Taxas</button>
+        </div>
+      </div>
+
+      {semConfig && (
+        <Card className="p-4 mb-4 bg-amber-50 border-amber-200">
+          <p className="text-sm text-amber-800">Configure a <b>taxa do iFood</b> e o <b>custo por brownie</b> no botão <b>Taxas</b> para os cálculos ficarem certos.</p>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        <Stat label="Vendido (bruto)" value={BRL(resumo.bruto)} />
+        <Stat label="Taxas iFood" value={BRL(resumo.taxa)} danger={resumo.taxa > 0} />
+        <Stat label="Líquido recebido" value={BRL(resumo.liq)} />
+        <Stat label="Custo produção" value={BRL(resumo.custo)} />
+        <Stat label="Lucro real" value={BRL(resumo.lucro)} highlight={resumo.lucro >= 0} danger={resumo.lucro < 0} accent={resumo.lucro >= 0} />
+        <Stat label="Brownies vendidos" value={resumo.qtd} />
+      </div>
+
+      {/* formulário só no desktop; no mobile usa o + central */}
+      <Card className="p-4 mb-4 hidden md:block">
+        <h3 className="font-bold text-amber-900 mb-3">Lançar pedido</h3>
+        <IfoodPedidoForm recipes={recipes} config={config} onSave={addPedido} />
+      </Card>
+      <p className="text-sm text-stone-500 mb-3 md:hidden">Para lançar um pedido, toque no botão <b>+</b> embaixo e escolha <b>Pedido iFood</b>.</p>
+
+      <Card className="p-2">
+        {doMes.length === 0 ? (
+          <div className="p-8 text-center text-stone-400"><ShoppingBag size={36} className="mx-auto mb-2 text-amber-200" />Nenhum pedido neste mês.</div>
+        ) : (
+          [...doMes].reverse().map((v) => {
+            const c = calc(v);
+            return (
+              <div key={v.id} className="flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-amber-50 rounded-lg">
+                <div className="min-w-0">
+                  <p className="font-medium text-stone-700 truncate">{c.q}× {recNome(v.receitaId)}</p>
+                  <p className="text-xs text-stone-400">{new Date(v.data).toLocaleDateString("pt-BR")} · bruto {BRL(c.b)} · taxa {BRL(c.tx)} · custo {BRL(c.custo)}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <p className="text-[10px] text-stone-400 uppercase leading-none">lucro real</p>
+                    <p className={`font-bold ${c.lucro >= 0 ? "text-green-700" : "text-red-600"}`}>{BRL(c.lucro)}</p>
+                  </div>
+                  <button onClick={() => remove(v.id)} className="text-stone-300 hover:text-red-500"><Trash2 size={16} /></button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </Card>
+
+      {showCfg && (
+        <ModalShell title="Taxas do iFood" onClose={() => setShowCfg(false)}>
+          <p className="text-sm text-stone-500 mb-3">Configure uma vez. Vale para todos os pedidos do iFood.</p>
+          <div className="space-y-3">
+            <Field label="Taxa do iFood (%)"><input type="number" value={config.ifoodTaxa || ""} onChange={(e) => setConfig({ ...config, ifoodTaxa: e.target.value })} placeholder="23" className="input" /></Field>
+            <Field label="Custo por brownie (R$)"><input type="number" value={config.ifoodCusto || ""} onChange={(e) => setConfig({ ...config, ifoodCusto: e.target.value })} placeholder="3.50" className="input" /></Field>
+            <button onClick={() => setShowCfg(false)} className="btn-primary w-full">Pronto</button>
+          </div>
+        </ModalShell>
+      )}
+    </div>
   );
 }

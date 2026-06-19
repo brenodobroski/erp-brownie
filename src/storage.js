@@ -55,6 +55,10 @@ function sanitize(data) {
   if (Array.isArray(d.ingredients)) {
     d.ingredients = d.ingredients.map((i) => ({ ...i, qtd: toNum(i.qtd) }));
   }
+  if (Array.isArray(d.ifood)) {
+    d.ifood = d.ifood.map((v) => ({ ...v, qtd: toNum(v.qtd), valorBruto: toNum(v.valorBruto) }));
+  }
+  if (!d.config || typeof d.config !== "object" || Array.isArray(d.config)) d.config = {};
   return d;
 }
 
