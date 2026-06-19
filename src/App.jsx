@@ -6,6 +6,9 @@ const BRL = (n) => "R$ " + (Number(n) || 0).toLocaleString("pt-BR", { minimumFra
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const ymd = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`; };
 const hojeISO = () => new Date().toISOString();
+// id como texto com prefixo de letra, para o Google Sheets NÃO converter em número científico
+let _idc = 0;
+const uid = (p = "id") => `${p}_${Date.now().toString(36)}${(_idc++).toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 
 const SECOES = [
   { key: "massa", label: "Massa" },
@@ -315,7 +318,7 @@ function Ingredientes({ ingredients, setIngredients }) {
   const up = (k, v) => setForm({ ...form, [k]: v });
   const add = () => {
     if (!form.nome.trim() || !form.qtd) return;
-    setIngredients([...ingredients, { id: Date.now().toString() + Math.random(), ...form }]);
+    setIngredients([...ingredients, { id: uid("ing"), ...form }]);
     setForm(empty);
   };
   const remove = (id) => setIngredients(ingredients.filter((i) => i.id !== id));
@@ -387,7 +390,7 @@ function IngredientRow({ ing, onSave, onRemove }) {
     <div className="flex items-center justify-between px-3 py-2.5 hover:bg-amber-50 rounded-lg">
       <span className="font-medium text-stone-700">{ing.nome}</span>
       <span className="flex items-center gap-4">
-        <span className="text-sm text-stone-500">{ing.qtd} {ing.unidade}</span>
+        <span className="text-sm text-stone-500">{Number(ing.qtd) || 0} {ing.unidade}</span>
         <button onClick={() => setEditing(true)} title="Editar" className="text-stone-300 hover:text-amber-600"><Pencil size={16} /></button>
         <button onClick={onRemove} title="Excluir" className="text-stone-300 hover:text-red-500"><Trash2 size={16} /></button>
       </span>
@@ -415,12 +418,12 @@ function Mercado({ trips, setTrips, ingredients }) {
   };
   const addItemLinha = () => {
     if (!ingSel || !valor) return;
-    setItens([...itens, { id: Date.now().toString() + Math.random(), ingredienteId: ingSel, valor }]);
+    setItens([...itens, { id: uid("it"), ingredienteId: ingSel, valor }]);
     setIngSel(""); setValor("");
   };
   const salvarIda = () => {
     if (itens.length === 0) return;
-    setTrips([...trips, { id: Date.now().toString(), mercado: mercado || "Mercado", data: hojeISO(), itens }]);
+    setTrips([...trips, { id: uid("trip"), mercado: mercado || "Mercado", data: hojeISO(), itens }]);
     setMercado(""); setItens([]); setShowNew(false);
   };
   const removeTrip = (id) => setTrips(trips.filter((t) => t.id !== id));
@@ -530,7 +533,7 @@ function DiffBadge({ diff, small }) {
 
 function Precificacao({ recipes, setRecipes, ingredients, ultimaCompra }) {
   const [editing, setEditing] = useState(null);
-  const blank = () => ({ id: Date.now().toString(), nome: "", rendimento: 12, margem: 100, secoes: { massa: [], recheio: [], embalagem: [], extras: [] } });
+  const blank = () => ({ id: uid("rec"), nome: "", rendimento: 12, margem: 100, secoes: { massa: [], recheio: [], embalagem: [], extras: [] } });
   const [draft, setDraft] = useState(blank());
   const normalize = (r) => ({ ...r, secoes: { massa: r.secoes?.massa || [], recheio: r.secoes?.recheio || [], embalagem: r.secoes?.embalagem || [], extras: r.secoes?.extras || [] } });
   const openNew = () => { setDraft(blank()); setEditing("new"); };
@@ -609,7 +612,7 @@ function SecaoEditor({ sec, itens, ingredients, ultimaCompra, onAdd, onDel }) {
   const ingOpts = ingredients.map((i) => ({ value: i.id, label: i.nome }));
   const ingNome = (id) => { const x = ingredients.find((i) => i.id === id); return x ? x.nome : "?"; };
   const previa = custoItemReceita(form, ultimaCompra, ingredients);
-  const confirmar = () => { if (!form.ingredienteId || !form.qtdUsada) return; onAdd({ id: Date.now().toString() + Math.random(), ...form }); setForm(empty); };
+  const confirmar = () => { if (!form.ingredienteId || !form.qtdUsada) return; onAdd({ id: uid("ri"), ...form }); setForm(empty); };
   const subtotal = itens.reduce((a, i) => a + custoItemReceita(i, ultimaCompra, ingredients), 0);
   return (
     <div className="mb-5">
@@ -644,9 +647,9 @@ function Clientes({ clients, setClients, recipes }) {
   const [showNew, setShowNew] = useState(false);
   const [nome, setNome] = useState("");
   const [endereco, setEndereco] = useState("");
-  const addClient = () => { if (!nome.trim()) return; setClients([...clients, { id: Date.now().toString(), nome, endereco, movimentos: [] }]); setNome(""); setEndereco(""); setShowNew(false); };
+  const addClient = () => { if (!nome.trim()) return; setClients([...clients, { id: uid("cli"), nome, endereco, movimentos: [] }]); setNome(""); setEndereco(""); setShowNew(false); };
   const remove = (id) => setClients(clients.filter((c) => c.id !== id));
-  const addMov = (clientId, mov) => setClients(clients.map((c) => c.id === clientId ? { ...c, movimentos: [...c.movimentos, { id: Date.now().toString(), ...mov }] } : c));
+  const addMov = (clientId, mov) => setClients(clients.map((c) => c.id === clientId ? { ...c, movimentos: [...c.movimentos, { id: uid("mov"), ...mov }] } : c));
   const delMov = (clientId, movId) => setClients(clients.map((c) => c.id === clientId ? { ...c, movimentos: c.movimentos.filter((m) => m.id !== movId) } : c));
   return (
     <div>
