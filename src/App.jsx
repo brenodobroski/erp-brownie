@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Cookie, Users, BarChart3, ShoppingBag, ShoppingCart, Carrot, Plus, Trash2, Pencil, X, ChevronRight, ChevronDown, Check, TrendingUp, TrendingDown, Store, Calendar, Settings, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import { Cookie, Users, BarChart3, ShoppingBag, ShoppingCart, Carrot, Plus, Trash2, Pencil, X, ChevronRight, ChevronDown, Check, Search, TrendingUp, TrendingDown, Store, Calendar, Settings, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { getSheetUrl, setSheetUrl as persistUrl, readCache, writeCache, clearCache, pull, push } from "./storage";
 
 const BRL = (n) => "R$ " + (Number(n) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -243,15 +243,19 @@ function Styles() {
   `}</style>;
 }
 
-function Dropdown({ value, onChange, options, placeholder = "Selecionar", style }) {
+function Dropdown({ value, onChange, options, placeholder = "Selecionar", style, searchable = false }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
   const ref = useRef(null);
   useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setQ(""); } };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
   const sel = options.find((o) => o.value === value);
+  const filtered = searchable && q.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()))
+    : options;
   return (
     <div className="relative" style={style} ref={ref}>
       <button type="button" onClick={() => setOpen(!open)}
@@ -261,16 +265,27 @@ function Dropdown({ value, onChange, options, placeholder = "Selecionar", style 
         <ChevronDown size={15} className={`text-stone-400 shrink-0 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 w-full bg-white border border-amber-100 rounded-xl shadow-lg max-h-56 overflow-y-auto py-1">
-          {options.length === 0 && <div className="px-3 py-2 text-sm text-stone-400">Nada cadastrado</div>}
-          {options.map((o) => (
-            <button key={o.value} type="button"
-              onClick={() => { onChange(o.value); setOpen(false); }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-amber-50 transition flex items-center justify-between ${o.value === value ? "bg-amber-50 text-amber-900 font-medium" : "text-stone-700"}`}>
-              <span className="truncate">{o.label}</span>
-              {o.value === value && <Check size={14} className="text-amber-600 shrink-0" />}
-            </button>
-          ))}
+        <div className="absolute z-30 mt-1 w-full bg-white border border-amber-100 rounded-xl shadow-lg overflow-hidden">
+          {searchable && (
+            <div className="p-2 border-b border-amber-50 sticky top-0 bg-white">
+              <div className="flex items-center gap-2 bg-stone-50 rounded-lg px-2">
+                <Search size={14} className="text-stone-400 shrink-0" />
+                <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..."
+                  className="bg-transparent outline-none text-sm py-2 w-full" />
+              </div>
+            </div>
+          )}
+          <div className="max-h-52 overflow-y-auto py-1">
+            {filtered.length === 0 && <div className="px-3 py-2 text-sm text-stone-400">{options.length === 0 ? "Nada cadastrado" : "Nada encontrado"}</div>}
+            {filtered.map((o) => (
+              <button key={o.value} type="button"
+                onClick={() => { onChange(o.value); setOpen(false); setQ(""); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-amber-50 transition flex items-center justify-between ${o.value === value ? "bg-amber-50 text-amber-900 font-medium" : "text-stone-700"}`}>
+                <span className="truncate">{o.label}</span>
+                {o.value === value && <Check size={14} className="text-amber-600 shrink-0" />}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -444,7 +459,7 @@ function Mercado({ trips, setTrips, ingredients }) {
           <div className="bg-stone-50 border border-stone-100 rounded-xl p-3 mb-3">
             <div className="flex flex-wrap items-end gap-2">
               <Field label="Ingrediente" style={{ flex: "1 1 220px" }}>
-                <Dropdown value={ingSel} onChange={setIngSel} options={ingOpts} placeholder="Escolher ingrediente" />
+                <Dropdown value={ingSel} onChange={setIngSel} options={ingOpts} placeholder="Escolher ingrediente" searchable />
               </Field>
               <Field label="Quanto pagou R$" style={{ width: 130 }}>
                 <input type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="40" className="input" />
@@ -562,10 +577,12 @@ function Precificacao({ recipes, setRecipes, ingredients, ultimaCompra }) {
           <Field label="Rende por forma" style={{ width: 130 }}><input type="number" value={draft.rendimento} onChange={(e) => setDraft({ ...draft, rendimento: e.target.value })} className="input" /></Field>
           <Field label="Margem (%)" style={{ width: 110 }}><input type="number" value={draft.margem} onChange={(e) => setDraft({ ...draft, margem: e.target.value })} className="input" /></Field>
         </div>
-        {SECOES.map((sec) => (
-          <SecaoEditor key={sec.key} sec={sec} itens={draft.secoes[sec.key]} ingredients={ingredients} ultimaCompra={ultimaCompra}
-            onAdd={(item) => addItem(sec.key, item)} onDel={(id) => delItem(sec.key, id)} />
-        ))}
+        <div className="grid md:grid-cols-2 gap-4 mb-2">
+          {SECOES.map((sec) => (
+            <SecaoEditor key={sec.key} sec={sec} itens={draft.secoes[sec.key]} ingredients={ingredients} ultimaCompra={ultimaCompra}
+              onAdd={(item) => addItem(sec.key, item)} onDel={(id) => delItem(sec.key, id)} />
+          ))}
+        </div>
         <div className="grid grid-cols-3 gap-3 my-6">
           <Stat label="Custo da forma" value={BRL(total)} />
           <Stat label="Custo por brownie" value={BRL(porBrownie)} highlight />
@@ -605,6 +622,13 @@ function Precificacao({ recipes, setRecipes, ingredients, ultimaCompra }) {
   );
 }
 
+const SEC_ESTILO = {
+  massa: { cor: "bg-amber-100 text-amber-800", emoji: "🍫" },
+  recheio: { cor: "bg-rose-100 text-rose-700", emoji: "🍓" },
+  embalagem: { cor: "bg-sky-100 text-sky-700", emoji: "📦" },
+  extras: { cor: "bg-violet-100 text-violet-700", emoji: "✨" },
+};
+
 function SecaoEditor({ sec, itens, ingredients, ultimaCompra, onAdd, onDel }) {
   const empty = { ingredienteId: "", qtdUsada: "", unidadeUso: "g" };
   const [form, setForm] = useState(empty);
@@ -614,30 +638,58 @@ function SecaoEditor({ sec, itens, ingredients, ultimaCompra, onAdd, onDel }) {
   const previa = custoItemReceita(form, ultimaCompra, ingredients);
   const confirmar = () => { if (!form.ingredienteId || !form.qtdUsada) return; onAdd({ id: uid("ri"), ...form }); setForm(empty); };
   const subtotal = itens.reduce((a, i) => a + custoItemReceita(i, ultimaCompra, ingredients), 0);
+  const est = SEC_ESTILO[sec.key] || SEC_ESTILO.massa;
+
   return (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 mb-2"><h3 className="font-semibold text-amber-900">{sec.label}</h3><span className="text-xs text-stone-400">{BRL(subtotal)}</span></div>
-      <div className="space-y-1 mb-2">
-        {itens.map((i) => {
-          const semPreco = !ultimaCompra(i.ingredienteId);
-          return (
-            <div key={i.id} className="flex items-center justify-between text-sm bg-amber-50/60 border border-amber-100 rounded-lg px-3 py-2">
-              <span className="text-stone-700"><b>{ingNome(i.ingredienteId)}</b><span className="text-stone-400"> · usa {i.qtdUsada}{i.unidadeUso}</span>{semPreco && <span className="text-orange-500 text-xs"> · sem compra registrada</span>}</span>
-              <span className="flex items-center gap-3"><b className="text-amber-800">{BRL(custoItemReceita(i, ultimaCompra, ingredients))}</b><button onClick={() => onDel(i.id)} className="text-stone-300 hover:text-red-500"><Trash2 size={15} /></button></span>
-            </div>
-          );
-        })}
+    <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-amber-50">
+        <h3 className="font-bold text-stone-800 flex items-center gap-2">
+          <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${est.cor}`}>{est.emoji}</span>
+          {sec.label}
+        </h3>
+        <span className="text-sm font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg">{BRL(subtotal)}</span>
       </div>
-      <div className="bg-stone-50 border border-stone-100 rounded-xl p-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <Field label="Ingrediente" style={{ flex: "1 1 180px" }}>
-            <Dropdown value={form.ingredienteId} onChange={(v) => up("ingredienteId", v)} options={ingOpts} placeholder="Escolher" />
+
+      <div className="px-4 py-3 flex-1">
+        {itens.length === 0 ? (
+          <p className="text-sm text-stone-400 py-2 text-center">Nenhum item ainda.</p>
+        ) : (
+          <div className="space-y-1.5 mb-2">
+            {itens.map((i) => {
+              const semPreco = !ultimaCompra(i.ingredienteId);
+              return (
+                <div key={i.id} className="flex items-center justify-between gap-2 text-sm bg-amber-50/40 rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-stone-700 truncate">{ingNome(i.ingredienteId)}</p>
+                    <p className="text-xs text-stone-400">usa {i.qtdUsada}{i.unidadeUso}{semPreco && <span className="text-orange-500"> · sem compra registrada</span>}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <b className="text-amber-800">{BRL(custoItemReceita(i, ultimaCompra, ingredients))}</b>
+                    <button onClick={() => onDel(i.id)} className="text-stone-300 hover:text-red-500"><Trash2 size={15} /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-stone-50 border-t border-stone-100 px-4 py-3">
+        <Field label="Ingrediente">
+          <Dropdown value={form.ingredienteId} onChange={(v) => up("ingredienteId", v)} options={ingOpts} placeholder="Escolher" searchable />
+        </Field>
+        <div className="flex items-end gap-2 mt-2">
+          <Field label="Quanto usa" style={{ flex: "1 1 auto" }}>
+            <input type="number" value={form.qtdUsada} onChange={(e) => up("qtdUsada", e.target.value)} placeholder="100" className="input" />
           </Field>
-          <Field label="Usou" style={{ width: 80 }}><input type="number" value={form.qtdUsada} onChange={(e) => up("qtdUsada", e.target.value)} placeholder="100" className="input" /></Field>
-          <Field label="Un." style={{ width: 80 }}><Dropdown value={form.unidadeUso} onChange={(v) => up("unidadeUso", v)} options={UNI_OPTS} /></Field>
-          <div className="pb-1 text-right" style={{ width: 80 }}><p className="text-[10px] text-stone-400 uppercase leading-none">Custo</p><p className="font-semibold text-amber-800 text-sm">{BRL(previa)}</p></div>
-          <button onClick={confirmar} className="btn-ok"><Check size={16} /> OK</button>
+          <Field label="Un." style={{ width: 78 }}>
+            <Dropdown value={form.unidadeUso} onChange={(v) => up("unidadeUso", v)} options={UNI_OPTS} />
+          </Field>
+          <button onClick={confirmar} className="btn-ok shrink-0" title="Adicionar item"><Plus size={16} /></button>
         </div>
+        {form.ingredienteId && form.qtdUsada ? (
+          <p className="text-xs text-stone-500 mt-2">Custo deste item: <b className="text-amber-800">{BRL(previa)}</b></p>
+        ) : null}
       </div>
     </div>
   );
