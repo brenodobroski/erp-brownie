@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Cookie, Users, BarChart3, ShoppingBag, ShoppingCart, Carrot, Plus, Trash2, X, ChevronRight, ChevronDown, Check, TrendingUp, TrendingDown, Store, Calendar, Settings, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import { Cookie, Users, BarChart3, ShoppingBag, ShoppingCart, Carrot, Plus, Trash2, Pencil, X, ChevronRight, ChevronDown, Check, TrendingUp, TrendingDown, Store, Calendar, Settings, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { getSheetUrl, setSheetUrl as persistUrl, readCache, writeCache, clearCache, pull, push } from "./storage";
 
 const BRL = (n) => "R$ " + (Number(n) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -319,11 +319,13 @@ function Ingredientes({ ingredients, setIngredients }) {
     setForm(empty);
   };
   const remove = (id) => setIngredients(ingredients.filter((i) => i.id !== id));
+  const updateIng = (id, patch) => setIngredients(ingredients.map((i) => i.id === id ? { ...i, ...patch } : i));
+
   return (
     <div>
       <SectionTitle>Ingredientes</SectionTitle>
       <Card className="p-4 mb-4">
-        <p className="text-sm text-stone-500 mb-3">Cadastre o que vocês usam. A <b>unidade</b> e o <b>peso de referência</b> são usados na receita e no mercado.</p>
+        <p className="text-sm text-stone-500 mb-3">Cadastre o que vocês usam. A <b>unidade</b> e o <b>peso de referência</b> são usados na receita e no mercado. Use <b>ponto</b> para decimais (ex: 1.5).</p>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Nome do ingrediente" style={{ flex: "1 1 200px" }}>
             <input value={form.nome} onChange={(e) => up("nome", e.target.value)} placeholder="Ex: Chocolate meio amargo" className="input" />
@@ -342,16 +344,53 @@ function Ingredientes({ ingredients, setIngredients }) {
       ) : (
         <Card className="p-2">
           {ingredients.map((i) => (
-            <div key={i.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-amber-50 rounded-lg">
-              <span className="font-medium text-stone-700">{i.nome}</span>
-              <span className="flex items-center gap-4">
-                <span className="text-sm text-stone-500">ref. {i.qtd} {i.unidade}</span>
-                <button onClick={() => remove(i.id)} className="text-stone-300 hover:text-red-500"><Trash2 size={16} /></button>
-              </span>
-            </div>
+            <IngredientRow key={i.id} ing={i} onSave={(patch) => updateIng(i.id, patch)} onRemove={() => remove(i.id)} />
           ))}
         </Card>
       )}
+    </div>
+  );
+}
+
+function IngredientRow({ ing, onSave, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [nome, setNome] = useState(ing.nome);
+  const [qtd, setQtd] = useState(ing.qtd);
+  const [unidade, setUnidade] = useState(ing.unidade);
+
+  const salvar = () => {
+    if (!nome.trim() || !qtd) return;
+    onSave({ nome, qtd, unidade });
+    setEditing(false);
+  };
+  const cancelar = () => { setNome(ing.nome); setQtd(ing.qtd); setUnidade(ing.unidade); setEditing(false); };
+
+  if (editing) {
+    return (
+      <div className="flex flex-wrap items-end gap-2 px-3 py-2.5 bg-amber-50/50 rounded-lg">
+        <Field label="Nome" style={{ flex: "1 1 180px" }}>
+          <input value={nome} onChange={(e) => setNome(e.target.value)} className="input" />
+        </Field>
+        <Field label="Qtd ref." style={{ width: 110 }}>
+          <input type="number" value={qtd} onChange={(e) => setQtd(e.target.value)} className="input" />
+        </Field>
+        <Field label="Unidade" style={{ width: 90 }}>
+          <Dropdown value={unidade} onChange={setUnidade} options={UNI_OPTS} />
+        </Field>
+        <button onClick={salvar} className="btn-ok"><Check size={16} /> Salvar</button>
+        <button onClick={cancelar} className="btn-ghost">Cancelar</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 hover:bg-amber-50 rounded-lg">
+      <span className="font-medium text-stone-700">{ing.nome}</span>
+      <span className="flex items-center gap-4">
+        <span className="text-sm text-stone-500">{ing.qtd} {ing.unidade}</span>
+        <button onClick={() => setEditing(true)} title="Editar" className="text-stone-300 hover:text-amber-600"><Pencil size={16} /></button>
+        <button onClick={onRemove} title="Excluir" className="text-stone-300 hover:text-red-500"><Trash2 size={16} /></button>
+      </span>
     </div>
   );
 }
